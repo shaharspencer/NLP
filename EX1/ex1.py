@@ -228,5 +228,4 @@ if __name__ == '__main__':
     print("The actor was born in USA, SENT PROB: ",  interpolation.sentProbability(sent2, returnLog=False))
     print("SENTS INTERPOLATION:", interpolation.computePerplexity())
 
-#
 
