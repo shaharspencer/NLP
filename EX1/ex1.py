@@ -14,7 +14,7 @@ class unigramModel():
     def __init__(self, dataset):
         self.freqDict = {}
         self.freqDict.keys()
-        self.dataset = dataset[:100]
+        self.dataset = dataset
 
     def fit(self):
         for text in self.dataset['text']:
@@ -66,7 +66,7 @@ class unigramModel():
 
 class bigramModel():
     def __init__(self, dataset):
-        self.dataset = dataset[:100]
+        self.dataset = dataset
         self.mat = None
 
     def firstPass(self):
@@ -88,9 +88,10 @@ class bigramModel():
 
     def fit(self):
         self.firstPass()
-        self.mat = np.zeros(
-            [len(self.numberAssociation.keys()),
-                             len(self.numberAssociation.keys())])
+        self.mat = {}
+        for key in self.numberAssociation.keys():
+            self.mat[key] = {key:0 for key in self.numberAssociation.keys()}
+
         for text in self.dataset['text']:
             doc = nlp(text)
             alphaTokens = ["START"] + [token.lemma_ for token in doc if token.is_alpha]
@@ -99,17 +100,17 @@ class bigramModel():
                     continue
                 prevIndx = self.numberAssociation[alphaTokens[i-1]]
                 currIndex = self.numberAssociation[alphaTokens[i]]
-                self.mat[prevIndx][currIndex] += 1
+                self.mat[alphaTokens[i-1]][alphaTokens[i]] += 1
 
     def Q2(self, prevWord):
         # predict next most likely word for prevWord
         if prevWord not in self.numberAssociation.keys():
             return
-
-        prevIndex = self.numberAssociation[prevWord]
-        nextIndex = np.argmax(self.mat[prevIndex][1:])
-        numList = list(self.numberAssociation.keys())
-        return numList[nextIndex + 1]
+        # prevIndex = self.numberAssociation[prevWord]
+        return max(self.mat[prevWord],key=self.mat[prevWord].get)
+        # nextIndex = np.argmax(self.mat[prevIndex][1:])
+        # numList = list(self.numberAssociation.keys())
+        # return numList[nextIndex + 1]
 
 
     def twoWordProbability(self, firstWord, secondWord):
@@ -117,7 +118,7 @@ class bigramModel():
             prevIndex = self.numberAssociation[firstWord]
             currIndex = self.numberAssociation[secondWord]
             return (self.mat[prevIndex][currIndex] /
-                             np.sum(self.mat[prevIndex]))
+                             sum(self.mat[prevIndex].values()))
         except KeyError:
             return 0
 
@@ -134,11 +135,11 @@ class bigramModel():
                 prevIndex = self.numberAssociation[alphaTokens[i-1]]
                 currIndex = self.numberAssociation[alphaTokens[i]]
                 if logProb:
-                    logProb *= (self.mat[prevIndex][currIndex]
-                                  / np.sum(self.mat[prevIndex]))
+                    logProb *= (self.mat[alphaTokens[i-1]][alphaTokens[i]]
+                                  / sum(self.mat[alphaTokens[i-1]].values()))
                 else:
-                    logProb = (self.mat[prevIndex][currIndex]
-                                  / np.sum(self.mat[prevIndex]))
+                    logProb = (self.mat[alphaTokens[i-1]][alphaTokens[i]]
+                                  / sum(self.mat[alphaTokens[i-1]].values()))
 
             except KeyError:
                 return 0
@@ -166,12 +167,11 @@ class bigramModel():
 
 
 class secondDegreeInterpolation():
-    def __init__(self, testSet, dataset, lambda1, lambda2):
+    def __init__(self, testSet, dataset, lambda1, lambda2, bigram):
         self.testSet = testSet
         self.unigram = unigramModel(dataset)
         self.unigram.fit()
-        self.bigram = bigramModel(dataset)
-        self.bigram.fit()
+        self.bigram = bigram
         self.lambda1 = lambda1
         self.lambda2 = lambda2
 
@@ -223,9 +223,8 @@ if __name__ == '__main__':
     print("Brad Pitt was born in Oklahoma, SENT PROB: ", s.sentenceProbability(sent1))
     print("The actor was born in USA, SENT PROB: ",  s.sentenceProbability(sent2))
     print(" Q3 B, TEST SET PERPLEXITY: ", s.measurePerplexity(sents))
-    interpolation = secondDegreeInterpolation(sents, dataset, lambda1=1/3, lambda2=2/3)
+    interpolation = secondDegreeInterpolation(sents, dataset, lambda1=1/3, lambda2=2/3, bigram=s)
     print("Brad Pitt was born in Oklahoma, SENT PROB: ", interpolation.sentProbability(sent1, returnLog=False))
     print("The actor was born in USA, SENT PROB: ",  interpolation.sentProbability(sent2, returnLog=False))
     print("SENTS INTERPOLATION:", interpolation.computePerplexity())
-
 
