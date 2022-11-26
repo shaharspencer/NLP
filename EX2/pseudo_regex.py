@@ -1,0 +1,28 @@
+import re
+
+def getPseudoTag(word):
+    if re.compile("[0-9][0-9]").fullmatch(word):
+        return "twoDigYr"
+    if re.compile("[0-2][0-9][0-9][0-9]").fullmatch(word):
+        return "forDigTy"
+    if re.compile("[0-9]*[A-Z]*[0-9]*[A-Z]*").fullmatch(word):
+        return "prodNum"
+    if re.compile("[0-3]?[0-9]\/[1-2]?[0-9]").fullmatch(word):
+        return "dateShort"
+    if re.compile("[0-3]?[0-9]\/[1-2]?[0-9]\/[0-9][0-9]").fullmatch(word):
+        return "dateLong"
+    if re.compile("[0-9]+\,?[0-9]*\.?[0-9]+").fullmatch(word):
+        return "amount"
+    if re.compile("[0-9]?[0-9]\.[0-9]+").fullmatch(word):
+        return "amountPercent"
+    if re.compile("[0-9]+").fullmatch(word):
+        return "otherNum"
+    if re.compile("[A-Z][A-Z]+").fullmatch(word):
+        return "allCaps"
+    if re.compile("[A-Z]\.").fullmatch(word):
+        return "capsPeriod"
+    if re.compile("[A-Z][a-z]+").fullmatch(word):
+        return "initCaps"
+    if re.compile("[a-z]+").fullmatch(word):
+        return "lowerCase"
+    return "other"
