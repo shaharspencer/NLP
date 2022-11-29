@@ -257,12 +257,10 @@ class BrownPOS(BigramHMM):
             for y in range(len(prediction)):
                 if sequence[y] in self.seen_words:
                     total_seen += 1
-                    if prediction[y] == labels[y]:
-                        correct_pred_seen += 1
+                    correct_pred_seen += (prediction[y] == labels[y])
                 else:
                     total_unseen += 1
-                    if prediction[y] == labels[y]:
-                        correct_pred_unseen += 1
+                    correct_pred_unseen += (prediction[y] == labels[y])
 
         return 1 - (correct_pred_seen / total_seen), \
                1 - (correct_pred_unseen / total_unseen), \
@@ -272,6 +270,7 @@ class BrownPOS(BigramHMM):
 class BrownLaplacePOS(BrownPOS):
 
     def computeEmissions(self):
+
         self.emissions = {}
         for sent in self.train:
             for word, pos in sent:
@@ -282,16 +281,22 @@ class BrownLaplacePOS(BrownPOS):
                 else:
                     self.emissions[pos][word] = self.emissions[pos].get(word, 0) + 1
 
+        self.unseen = set()
+        for sent in self.train:
+            for word, pos in sent:
+                if word not in self.seen_words:
+                    self.unseen.add(word)
+
     def getEmission(self, x, given_y):
         """
         if word is not in train data, treat as if it appeared once as NN
         """
-        divider = sum(self.emissions[given_y].values())
-        epsilon = len(self.emissions[given_y].keys())
+        count = sum(self.emissions[given_y].values())
+        v = len(self.seen_words.keys()) + len(self.unseen)
         try:
-            return (self.emissions[given_y][x] + 1) / (divider + epsilon)
+            return (self.emissions[given_y][x] + 1) / (count + v)
         except KeyError:
-            return 1 / (divider + epsilon)
+            return 1 / (count + v)
 
 
 class PseudoBrownPOS(BrownPOS):
@@ -341,13 +346,13 @@ class PseudoLaplacePOS(PseudoBrownPOS, BrownLaplacePOS):
 
 
 if __name__ == "__main__":
-    # -------------------------------- question 1 --------------------------------
+    print("-------------------------------- question 1 --------------------------------")
     nucleotide = NucleotideHMM()
     nucleotide.fit()
     print("Most likely state sequence for nucleotides:")
     print(nucleotide.predict("ACCGTGCA")[1])
 
-    # -------------------------------- question 3 --------------------------------
+    print("-------------------------------- question 3 --------------------------------")
     # import ssl
     #
     # try:
@@ -360,33 +365,38 @@ if __name__ == "__main__":
     # nltk.download('tagsets')
 
     # MLE ERROR
+    print("-------------------------------- b.ii --------------------------------")
     print("Errors for MLE: (seen, unseen, both):")
     print(computeErrorMLE(brown.tagged_sents(categories="news")))
 
+    print("-------------------------------- c.iii --------------------------------")
     # Error for simple pos tagger
     posTagger = BrownPOS()
     posTagger.fit()
     print("Errors for POS tagger: (seen, unseen, both):")
-    # print(posTagger.computeError())
+    print(posTagger.computeError())
     # print(nltk.help.brown_tagset('HV'))
 
+    print("-------------------------------- d.ii --------------------------------")
     # Error for add one smoothing POS tagger
     laplace = BrownLaplacePOS()
     laplace.fit()
     print("Errors for add one smoothed POS tagger: (seen, unseen, both):")
-    # print(laplace.computeError())
+    print(laplace.computeError())
 
+    print("-------------------------------- e.ii --------------------------------")
     # Error for Pseudo words POS tagger
     print("Errors for Pseudo words POS tagger: (seen, unseen, both):")
     pseudo = PseudoBrownPOS()
     pseudo.fit()
-    # print(pseudo.computeError())
+    print(pseudo.computeError())
 
-    # Error for Pseudo words POS tagger
+    print("-------------------------------- e.iii --------------------------------")
+    # Error for Pseudo words add one  POS tagger
     print("Errors for Pseudo Laplace POS tagger: (seen, unseen, both):")
     pseudoLaplace = PseudoLaplacePOS()
     pseudoLaplace.fit()
-    # print(pseudoLaplace.computeError())
+    print(pseudoLaplace.computeError())
 
     print("Exploring confusion matrix..")
     pseudoLaplace.computeConfusionMatrix()
