@@ -277,9 +277,9 @@ class BrownLaplacePOS(BrownPOS):
                 self.seen_words[word] = self.seen_words.get(word, 0) + 1
 
                 if pos not in self.emissions:
-                    self.emissions[pos] = {word: 1}
+                    self.emissions[pos] = {word: 2}
                 else:
-                    self.emissions[pos][word] = self.emissions[pos].get(word, 0) + 1
+                    self.emissions[pos][word] = self.emissions[pos].get(word, 1) + 1
 
         self.unseen = set()
         for sent in self.train:
@@ -294,7 +294,7 @@ class BrownLaplacePOS(BrownPOS):
         count = sum(self.emissions[given_y].values())
         v = len(self.seen_words.keys()) + len(self.unseen)
         try:
-            return (self.emissions[given_y][x] + 1) / (count + v)
+            return (self.emissions[given_y][x]) / (count + v)
         except KeyError:
             return 1 / (count + v)
 
