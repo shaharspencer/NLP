@@ -78,7 +78,7 @@ def load(model, path, optimizer):
 def load_word2vec():
     """ Load Word2Vec Vectors
         Return:
-            wv_from_bin: All 3 million embeddings, each lengh 300
+            wv_from_bin: All 3 million embeddings, each length 300
     """
     import gensim.downloader as api
     wv_from_bin = api.load("word2vec-google-news-300")
@@ -125,7 +125,9 @@ def get_one_hot(size, ind):
     :param ind: the entry index to turn to 1
     :return: numpy ndarray which represents the one-hot vector
     """
-    return
+    vec = np.zeros(size)
+    vec[ind] = 1
+    return vec
 
 
 def average_one_hots(sent, word_to_ind):
@@ -136,7 +138,18 @@ def average_one_hots(sent, word_to_ind):
     :param word_to_ind: a mapping between words to indices
     :return:
     """
-    return
+    word_num = len(word_to_ind.keys())
+    return_vec = np.zeros(word_num)
+    for token in sent.text:
+        try:
+            token_ind = word_to_ind[token]
+            one_hot_rep = get_one_hot(word_num, token_ind)
+            return_vec += one_hot_rep
+        except KeyError:
+            print("average one hots - tried to access word_to_ind with word that does not exist")
+            exit(1)
+    average_vector = return_vec / word_num
+    return average_vector
 
 
 def get_word_to_ind(words_list):
@@ -146,7 +159,12 @@ def get_word_to_ind(words_list):
     :param words_list: a list of words
     :return: the dictionary mapping words to the index
     """
-    return
+    words_list = set(words_list)
+    counter = [i for i in range(len(words_list))]
+    word_mapping = {}
+    for word, count in zip(words_list, counter):
+        word_mapping[word] = count
+    return word_mapping
 
 
 def sentence_to_embedding(sent, word_to_vec, seq_len, embedding_dim=300):
@@ -307,6 +325,7 @@ def binary_accuracy(preds, y):
     :param y: a vector of true labels
     :return: scalar value - (<number of accurate predictions> / <number of examples>)
     """
+    number_of_labels = y.shape[0]
 
     return
 
@@ -320,6 +339,11 @@ def train_epoch(model, data_iterator, optimizer, criterion):
     :param optimizer: the optimizer object for the training process.
     :param criterion: the criterion object for the training process.
     """
+
+    # iterate over data
+    for sent in data_iterator:
+        print(sent)
+
 
     return
 
@@ -348,7 +372,7 @@ def get_predictions_for_data(model, data_iter):
     return
 
 
-def train_model(model, data_manager, n_epochs, lr, weight_decay=0.):
+def train_model(model: nn.Module, data_manager: DataManager, n_epochs, lr, weight_decay=0.):
     """
     Runs the full training procedure for the given model. The optimization should be done using the Adam
     optimizer with all parameters but learning rate and weight decay set to default.
@@ -358,6 +382,18 @@ def train_model(model, data_manager, n_epochs, lr, weight_decay=0.):
     :param lr: learning rate to be used for optimization
     :param weight_decay: parameter for l2 regularization
     """
+    # SAID TO LEAVE PARAMETERS DEFAULT ??
+    # adam_optimizer = torch.optim.Adam(lr=lr,weight_decay=weight_decay)
+    # NEEDS TO RECIEVE PARAMETERS BEFORE???
+    criterion = F.binary_cross_entropy_with_logits
+    train_iterator = data_manager.get_torch_iterator(TRAIN)
+    for _ in range(n_epochs):
+        train_epoch(model, train_iterator, None, criterion=criterion)
+
+
+
+
+
     return
 
 
@@ -365,6 +401,15 @@ def train_log_linear_with_one_hot():
     """
     Here comes your code for training and evaluation of the log linear model with one hot representation.
     """
+    # load data
+    dataManager = DataManager(ONEHOT_AVERAGE, batch_size=64)
+
+    # find out what this is
+    logLinearModel = LogLinear(300)
+
+    train_model(logLinearModel, dataManager, n_epochs=20, lr=0.01, weight_decay=0.001)
+
+
     return
 
 

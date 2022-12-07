@@ -335,7 +335,7 @@ def get_rare_words_examples(sentences_list, dataset: SentimentTreeBank,
     indexed_sentences = list(filter(lambda s: len(get_sentiment_words(s[1])) > 0, indexed_sentences))
     indexed_sentences = sorted(indexed_sentences, key= lambda s: max([get_count(node) for node in
                                                                       get_sentiment_words(s[1])]))
-    indices = [i for i,s in indexed_sentences]
+    indices = [i for i, s in indexed_sentences]
     return indices[:num_sentences]
 
 
