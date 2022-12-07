@@ -305,13 +305,21 @@ class LogLinear(nn.Module):
     general class for the log-linear models for sentiment analysis.
     """
     def __init__(self, embedding_dim):
+
+        super().__init__()
+        self._parameters = {"weights": torch.FloatTensor(np.zeros(embedding_dim))}
         return
 
-    def forward(self, x):
-        return
+
+
+    def forward(self, x: torch.tensor):
+        yhat_tensor = x.detach().numpy() @ self._parameters["weights"].detach().numpy()
+        return torch.from_numpy(yhat_tensor)
+
 
     def predict(self, x):
         return
+
 
 
 # ------------------------- training functions -------------
@@ -330,7 +338,7 @@ def binary_accuracy(preds, y):
     return
 
 
-def train_epoch(model, data_iterator, optimizer, criterion):
+def train_epoch(model, data_iterator, optimizer, criterion: F.binary_cross_entropy_with_logits):
     """
     This method operates one epoch (pass over the whole train set) of training of the given model,
     and returns the accuracy and loss for this epoch
@@ -339,12 +347,15 @@ def train_epoch(model, data_iterator, optimizer, criterion):
     :param optimizer: the optimizer object for the training process.
     :param criterion: the criterion object for the training process.
     """
-
     # iterate over data
-    for sent in data_iterator:
-        print(sent)
-
-
+    for batch in data_iterator:
+        batch_data, batch_labels = batch[0], batch[1]
+        yhat_tensor = model.forward(batch_data)
+        # something weird here??
+        loss = criterion(input=yhat_tensor, target=batch_labels)
+        # SHOULD THIS BE HERE??
+        optimizer.zero_grad()
+        optimizer.step()
     return
 
 
@@ -383,16 +394,14 @@ def train_model(model: nn.Module, data_manager: DataManager, n_epochs, lr, weigh
     :param weight_decay: parameter for l2 regularization
     """
     # SAID TO LEAVE PARAMETERS DEFAULT ??
-    # adam_optimizer = torch.optim.Adam(lr=lr,weight_decay=weight_decay)
+    adam_optimizer = torch.optim.Adam(params=model.parameters(), lr=lr,weight_decay=weight_decay)
     # NEEDS TO RECIEVE PARAMETERS BEFORE???
     criterion = F.binary_cross_entropy_with_logits
     train_iterator = data_manager.get_torch_iterator(TRAIN)
+
+
     for _ in range(n_epochs):
-        train_epoch(model, train_iterator, None, criterion=criterion)
-
-
-
-
+        train_epoch(model, train_iterator, adam_optimizer, criterion=criterion)
 
     return
 
@@ -405,10 +414,10 @@ def train_log_linear_with_one_hot():
     dataManager = DataManager(ONEHOT_AVERAGE, batch_size=64)
 
     # find out what this is
-    logLinearModel = LogLinear(300)
+    dataManager.get_input_shape()
+    logLinearModel = LogLinear(embedding_dim=16271)
 
     train_model(logLinearModel, dataManager, n_epochs=20, lr=0.01, weight_decay=0.001)
-
 
     return
 
