@@ -9,7 +9,7 @@ import operator
 import data_loader
 import pickle
 import tqdm
-
+from torch.autograd import Variable
 # ------------------------------------------- Constants ----------------------------------------
 
 SEQ_LEN = 52
@@ -307,19 +307,16 @@ class LogLinear(nn.Module):
     def __init__(self, embedding_dim):
 
         super().__init__()
-        self._parameters = {"weights": torch.FloatTensor(np.zeros(embedding_dim))}
-        return
+        self._parameters = {"weights": torch.FloatTensor(np.ones(embedding_dim)),
+                            "bias": torch.tensor(0.1)}
 
-
-
-    def forward(self, x: torch.tensor):
-        yhat_tensor = x.detach().numpy() @ self._parameters["weights"].detach().numpy()
-        return torch.from_numpy(yhat_tensor)
-
+    def forward(self, x):
+        return x.float() @ self._parameters["weights"] + self._parameters["bias"]
 
     def predict(self, x):
-        return
-
+        # verify later
+        sigmoid = nn.Sigmoid()
+        return torch.round(sigmoid(x @ self._parameters["weights"] + self._parameters["bias"]))
 
 
 # ------------------------- training functions -------------
@@ -350,10 +347,11 @@ def train_epoch(model, data_iterator, optimizer, criterion: F.binary_cross_entro
     # iterate over data
     for batch in data_iterator:
         batch_data, batch_labels = batch[0], batch[1]
-        yhat_tensor = model.forward(batch_data)
+        prediction = model(batch_data)
         # something weird here??
-        loss = criterion(input=yhat_tensor, target=batch_labels)
+        loss = criterion(input=Variable(prediction, requires_grad=True), target=Variable(batch_labels, requires_grad=True))
         # SHOULD THIS BE HERE??
+        loss.backward()
         optimizer.zero_grad()
         optimizer.step()
     return
@@ -394,11 +392,10 @@ def train_model(model: nn.Module, data_manager: DataManager, n_epochs, lr, weigh
     :param weight_decay: parameter for l2 regularization
     """
     # SAID TO LEAVE PARAMETERS DEFAULT ??
-    adam_optimizer = torch.optim.Adam(params=model.parameters(), lr=lr,weight_decay=weight_decay)
+    adam_optimizer = torch.optim.Adam(params=model.parameters(), lr=lr, weight_decay=weight_decay)
     # NEEDS TO RECIEVE PARAMETERS BEFORE???
     criterion = F.binary_cross_entropy_with_logits
     train_iterator = data_manager.get_torch_iterator(TRAIN)
-
 
     for _ in range(n_epochs):
         train_epoch(model, train_iterator, adam_optimizer, criterion=criterion)
@@ -414,11 +411,11 @@ def train_log_linear_with_one_hot():
     dataManager = DataManager(ONEHOT_AVERAGE, batch_size=64)
 
     # find out what this is
-    dataManager.get_input_shape()
     logLinearModel = LogLinear(embedding_dim=16271)
 
     train_model(logLinearModel, dataManager, n_epochs=20, lr=0.01, weight_decay=0.001)
 
+    print(logLinearModel.parameters())
     return
 
 
