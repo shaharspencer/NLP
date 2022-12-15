@@ -417,7 +417,7 @@ def train_model(model: nn.Module, data_manager: DataManager, n_epochs, lr, weigh
         valid_loss_lst.append(loss)
         valid_accuracy_lst.append(accuracy)
 
-        print(loss)
+        print(loss, accuracy)
 
 
 def train_log_linear_with_one_hot():
