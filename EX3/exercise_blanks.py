@@ -317,8 +317,8 @@ class LogLinear(nn.Module):
     def __init__(self, embedding_dim):
 
         super().__init__()
-        self._parameters = {"weights": torch.randn(embedding_dim, requires_grad=True, dtype=torch.float64)}#,
-                            #"bias": torch.randn(1, requires_grad=True, dtype=torch.float64)}
+        self._parameters = {"weights": torch.randn(embedding_dim, requires_grad=True, dtype=torch.float64),
+                            "bias": torch.randn(1, requires_grad=True, dtype=torch.float64)}
 
     def forward(self, x):
         return x @ self._parameters["weights"] + self._parameters["bias"]
@@ -392,7 +392,14 @@ def get_predictions_for_data(model, data_iter):
     :param data_iter: torch iterator as given by the DataManager
     :return:
     """
-    return
+    predictions = np.array([])
+    with torch.no_grad:
+        for batch in data_iter:
+            batch_data = batch[0]
+            predictions = np.concatenate(predictions, model.predict(batch_data))
+
+    return predictions
+
 
 
 def train_model(model: nn.Module, data_manager: DataManager, n_epochs, lr, weight_decay=0.):
@@ -427,7 +434,8 @@ def train_model(model: nn.Module, data_manager: DataManager, n_epochs, lr, weigh
         valid_loss_lst.append(loss)
         valid_accuracy_lst.append(accuracy)
 
-        print(loss, accuracy)
+    draw_two_subgraphs(train_loss_lst, "train loss",valid_loss_lst, "Validation loss", "loss")
+    draw_two_subgraphs(train_accuracy_lst, "train accuracy",  valid_accuracy_lst, "Validation accuracy", "accuracy")
 
 
 def train_log_linear_with_one_hot():
@@ -464,13 +472,6 @@ def train_lstm_with_w2v():
     """
     return
 
-
-if __name__ == '__main__':
-    train_log_linear_with_one_hot()
-    # train_log_linear_with_w2v()
-    # train_lstm_with_w2v()
-
-
 def draw_two_subgraphs(arr1, arr1_label, arr2, arr2_label, loss_or_accuracy):
     import matplotlib.pyplot as plt
     t = np.arange(0, len(arr1), 1)
@@ -480,3 +481,11 @@ def draw_two_subgraphs(arr1, arr1_label, arr2, arr2_label, loss_or_accuracy):
     plt.xlabel("epoch #")
     plt.ylabel(loss_or_accuracy)
     plt.show()
+
+
+if __name__ == '__main__':
+    train_log_linear_with_one_hot()
+    # train_log_linear_with_w2v()
+    # train_lstm_with_w2v()
+
+
