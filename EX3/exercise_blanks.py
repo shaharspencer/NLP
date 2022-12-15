@@ -115,7 +115,18 @@ def get_w2v_average(sent, word_to_vec, embedding_dim):
     :param embedding_dim: the dimension of the word embedding vectors
     :return The average embedding vector as numpy ndarray.
     """
-    return
+
+    return_vec = np.zeros(embedding_dim)
+    for token in sent.text:
+        try:
+            token_mapping = word_to_vec[token]
+            return_vec += token_mapping
+        except KeyError:
+            print(
+                "word to vec dict - tried to access word_to_ind with word that does not exist")
+            exit(1)
+    average_vector = return_vec / return_vec.shape
+    return average_vector
 
 
 def get_one_hot(size, ind):
@@ -243,7 +254,7 @@ class DataManager():
             self.sent_func = sentence_to_embedding
 
             self.sent_func_kwargs = {"seq_len": SEQ_LEN,
-                                     "word_to_vec": create_or_load_slim_w2v(words_list),
+                                     "word_to_vec": create_or_load_slim_w2v(words_list, cache_w2v=True),
                                      "embedding_dim": embedding_dim
                                      }
         elif data_type == W2V_AVERAGE:
@@ -282,8 +293,6 @@ class DataManager():
         return self.torch_datasets[TRAIN][0][0].shape
 
 
-
-
 # ------------------------------------ Models ----------------------------------------------------
 
 class LSTM(nn.Module):
@@ -307,22 +316,25 @@ class LogLinear(nn.Module):
     def __init__(self, embedding_dim):
 
         super().__init__()
-        self._parameters = {"weights": torch.randn(embedding_dim, requires_grad=True, dtype=torch.float64),
-                            "bias": torch.randn(1, requires_grad=True, dtype=torch.float64)}
+        self._parameters = {"weights": torch.FloatTensor(np.zeros(embedding_dim))}
+        return
 
-    def forward(self, x):
-        return x @ self._parameters["weights"] + self._parameters["bias"]
+
+
+    def forward(self, x: torch.tensor):
+        yhat_tensor = x.detach().numpy() @ self._parameters["weights"].detach().numpy()
+        return torch.from_numpy(yhat_tensor)
+
 
     def predict(self, x):
-        # verify later
-        sigmoid = nn.Sigmoid()
-        return sigmoid(x @ self._parameters["weights"] + self._parameters["bias"])
+        return
+
 
 
 # ------------------------- training functions -------------
 
 
-def binary_accuracy(preds: np.ndarray, y: np.ndarray):
+def binary_accuracy(preds, y):
     """
     This method returns tha accuracy of the predictions, relative to the labels.
     You can choose whether to use numpy arrays or tensors here.
@@ -330,8 +342,9 @@ def binary_accuracy(preds: np.ndarray, y: np.ndarray):
     :param y: a vector of true labels
     :return: scalar value - (<number of accurate predictions> / <number of examples>)
     """
-    correct = np.sum(np.round(preds) == y)
-    return correct / preds.size
+    number_of_labels = y.shape[0]
+
+    return
 
 
 def train_epoch(model, data_iterator, optimizer, criterion: F.binary_cross_entropy_with_logits):
@@ -346,15 +359,13 @@ def train_epoch(model, data_iterator, optimizer, criterion: F.binary_cross_entro
     # iterate over data
     for batch in data_iterator:
         batch_data, batch_labels = batch[0], batch[1]
-        prediction = model(batch_data)
+        yhat_tensor = model.forward(batch_data)
         # something weird here??
-        loss = criterion(input=prediction, target=batch_labels)
+        loss = criterion(input=yhat_tensor, target=batch_labels)
         # SHOULD THIS BE HERE??
-        loss.backward()
-        optimizer.step()
         optimizer.zero_grad()
-
-    return loss, binary_accuracy(prediction.detach().numpy(), batch_labels.detach().numpy())
+        optimizer.step()
+    return
 
 
 def evaluate(model, data_iterator, criterion):
@@ -365,18 +376,7 @@ def evaluate(model, data_iterator, criterion):
     :param criterion: the loss criterion used for evaluation
     :return: tuple of (average loss over all examples, average accuracy over all examples)
     """
-    pass
-    for batch in data_iterator:
-        batch_data, batch_labels = batch[0], batch[1]
-        prediction = model(batch_data)
-        # something weird here??
-        loss = criterion(input=prediction, target=batch_labels)
-        # SHOULD THIS BE HERE??
-        loss.backward()
-        # optimizer.step()
-        # optimizer.zero_grad()
-
-    return loss, binary_accuracy(prediction.detach().numpy(), batch_labels.detach().numpy())
+    return
 
 
 def get_predictions_for_data(model, data_iter):
@@ -403,19 +403,13 @@ def train_model(model: nn.Module, data_manager: DataManager, n_epochs, lr, weigh
     :param weight_decay: parameter for l2 regularization
     """
     # SAID TO LEAVE PARAMETERS DEFAULT ??
-    adam_optimizer = torch.optim.Adam(params=model.parameters(), lr=lr, weight_decay=weight_decay)
+    adam_optimizer = torch.optim.Adam(params=model.parameters(), lr=lr,weight_decay=weight_decay)
     # NEEDS TO RECIEVE PARAMETERS BEFORE???
     criterion = F.binary_cross_entropy_with_logits
     train_iterator = data_manager.get_torch_iterator(TRAIN)
 
-    loss_lst = []
-    accuracy_lst = []
-
     for _ in range(n_epochs):
-        loss, accuracy = train_epoch(model, train_iterator, adam_optimizer, criterion=criterion)
-        loss_lst.append(loss)
-        accuracy_lst.append(accuracy)
-
+        train_epoch(model, train_iterator, adam_optimizer, criterion=criterion)
     return
 
 
@@ -427,11 +421,9 @@ def train_log_linear_with_one_hot():
     dataManager = DataManager(ONEHOT_AVERAGE, batch_size=64)
 
     # find out what this is
-    logLinearModel = LogLinear(embedding_dim=len(list(dataManager.sentiment_dataset.get_word_counts())))
+    logLinearModel = LogLinear(embedding_dim=16271)
 
     train_model(logLinearModel, dataManager, n_epochs=20, lr=0.01, weight_decay=0.001)
-
-    print(logLinearModel.parameters())
     return
 
 
@@ -440,7 +432,31 @@ def train_log_linear_with_w2v():
     Here comes your code for training and evaluation of the log linear model with word embeddings
     representation.
     """
+    dataManager = DataManager(W2V_AVERAGE, batch_size=64)
+    it = dataManager.get_torch_iterator(TRAIN)
+    logLinearModel = LogLinear(embedding_dim=16271)
+    train_model(logLinearModel, dataManager, n_epochs=20, lr=0.01,
+                weight_decay=0.001)
+
+    draw_relevant_graphs()
+
+    calculate_test_loss_and_accuracy()
+
     return
+
+def draw_relevant_graphs():
+    # NEED TO UNITE
+    # plot relevant graphs
+    # draw losses for loss: train, validation sets
+    draw_from_array(None, "epoch number", "train and loss value")
+    draw_from_array(None, "epoch number", "validation loss value")
+    #
+    # # draw train accuracy
+    # draw_from_array(None, "epoch number", "train accuracy value")
+    # draw_from_array(None, "epoch number", "validation accuracy value")
+
+def calculate_test_loss_and_accuracy():
+    pass
 
 
 def train_lstm_with_w2v():
@@ -449,8 +465,18 @@ def train_lstm_with_w2v():
     """
     return
 
+def draw_from_array(data_array, x_title, y_title):
+    import matplotlib.pyplot as plt
+    x = range(len(data_array))
+    y = data_array
+    plt.plot(x, y)
+    plt.xlabel(x_title)
+    plt.ylabel(y_title)
+    plt.show()
+
+
 
 if __name__ == '__main__':
-    train_log_linear_with_one_hot()
-    # train_log_linear_with_w2v()
+    # train_log_linear_with_one_hot()
+    train_log_linear_with_w2v()
     # train_lstm_with_w2v()
