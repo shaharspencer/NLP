@@ -415,7 +415,7 @@ def train_model(model: nn.Module, data_manager: DataManager, n_epochs, lr, weigh
         loss_lst.append(loss)
         accuracy_lst.append(accuracy)
 
-    return
+    return loss_lst, accuracy_lst
 
 
 def train_log_linear_with_one_hot():
@@ -428,10 +428,12 @@ def train_log_linear_with_one_hot():
     # find out what this is
     logLinearModel = LogLinear(embedding_dim=len(list(dataManager.sentiment_dataset.get_word_counts())))
 
-    train_model(logLinearModel, dataManager, n_epochs=20, lr=0.01, weight_decay=0.001)
-
+    loss_lst, accuracy_lst = train_model(logLinearModel, dataManager, n_epochs=20, lr=0.01, weight_decay=0.001)
+    draw_from_array(loss_lst, "epoch number", "train loss values")
+    draw_from_array(accuracy_lst, "epoch number", "train accuracy value")
     print(logLinearModel.parameters())
     return
+
 
 
 def train_log_linear_with_w2v():
@@ -439,7 +441,30 @@ def train_log_linear_with_w2v():
     Here comes your code for training and evaluation of the log linear model with word embeddings
     representation.
     """
+    dataManager = DataManager(W2V_AVERAGE, batch_size=64)
+    it = dataManager.get_torch_iterator(TRAIN)
+    logLinearModel = LogLinear(embedding_dim=16271)
+    train_model(logLinearModel, dataManager, n_epochs=20, lr=0.01,
+                weight_decay=0.001)
+
+
+
+    calculate_test_loss_and_accuracy()
+
     return
+
+# def draw_relevant_graphs():
+#     # NEED TO UNITE
+#     # plot relevant graphs
+#     # draw losses for loss: train, validation sets
+#
+#     #
+#     # # draw train accuracy
+#     # draw_from_array(None, "epoch number", "train accuracy value")
+#     # draw_from_array(None, "epoch number", "validation accuracy value")
+
+def calculate_test_loss_and_accuracy():
+    pass
 
 
 def train_lstm_with_w2v():
@@ -447,6 +472,15 @@ def train_lstm_with_w2v():
     Here comes your code for training and evaluation of the LSTM model.
     """
     return
+
+def draw_from_array(data_array, x_title, y_title):
+    import matplotlib.pyplot as plt
+    x = range(len(data_array))
+    y = data_array
+    plt.plot(x, y)
+    plt.xlabel(x_title)
+    plt.ylabel(y_title)
+    plt.show()
 
 
 if __name__ == '__main__':
