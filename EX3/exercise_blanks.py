@@ -115,7 +115,18 @@ def get_w2v_average(sent, word_to_vec, embedding_dim):
     :param embedding_dim: the dimension of the word embedding vectors
     :return The average embedding vector as numpy ndarray.
     """
-    return
+
+    return_vec = np.zeros(embedding_dim)
+    for token in sent.text:
+        try:
+            token_mapping = word_to_vec[token]
+            return_vec += token_mapping
+        except KeyError:
+            print(
+                "word to vec dict - tried to access word_to_ind with word that does not exist")
+            exit(1)
+    average_vector = return_vec / return_vec.shape
+    return average_vector
 
 
 def get_one_hot(size, ind):
@@ -243,7 +254,7 @@ class DataManager():
             self.sent_func = sentence_to_embedding
 
             self.sent_func_kwargs = {"seq_len": SEQ_LEN,
-                                     "word_to_vec": create_or_load_slim_w2v(words_list),
+                                     "word_to_vec": create_or_load_slim_w2v(words_list, cache_w2v=True),
                                      "embedding_dim": embedding_dim
                                      }
         elif data_type == W2V_AVERAGE:
@@ -280,8 +291,6 @@ class DataManager():
         :return: the shape of a single example from this dataset (only of x, ignoring y the label).
         """
         return self.torch_datasets[TRAIN][0][0].shape
-
-
 
 
 # ------------------------------------ Models ----------------------------------------------------
@@ -399,10 +408,8 @@ def train_model(model: nn.Module, data_manager: DataManager, n_epochs, lr, weigh
     criterion = F.binary_cross_entropy_with_logits
     train_iterator = data_manager.get_torch_iterator(TRAIN)
 
-
     for _ in range(n_epochs):
         train_epoch(model, train_iterator, adam_optimizer, criterion=criterion)
-
     return
 
 
@@ -414,11 +421,9 @@ def train_log_linear_with_one_hot():
     dataManager = DataManager(ONEHOT_AVERAGE, batch_size=64)
 
     # find out what this is
-    dataManager.get_input_shape()
     logLinearModel = LogLinear(embedding_dim=16271)
 
     train_model(logLinearModel, dataManager, n_epochs=20, lr=0.01, weight_decay=0.001)
-
     return
 
 
@@ -427,7 +432,31 @@ def train_log_linear_with_w2v():
     Here comes your code for training and evaluation of the log linear model with word embeddings
     representation.
     """
+    dataManager = DataManager(W2V_AVERAGE, batch_size=64)
+    it = dataManager.get_torch_iterator(TRAIN)
+    logLinearModel = LogLinear(embedding_dim=16271)
+    train_model(logLinearModel, dataManager, n_epochs=20, lr=0.01,
+                weight_decay=0.001)
+
+    draw_relevant_graphs()
+
+    calculate_test_loss_and_accuracy()
+
     return
+
+def draw_relevant_graphs():
+    # NEED TO UNITE
+    # plot relevant graphs
+    # draw losses for loss: train, validation sets
+    draw_from_array(None, "epoch number", "train and loss value")
+    draw_from_array(None, "epoch number", "validation loss value")
+    #
+    # # draw train accuracy
+    # draw_from_array(None, "epoch number", "train accuracy value")
+    # draw_from_array(None, "epoch number", "validation accuracy value")
+
+def calculate_test_loss_and_accuracy():
+    pass
 
 
 def train_lstm_with_w2v():
@@ -436,8 +465,18 @@ def train_lstm_with_w2v():
     """
     return
 
+def draw_from_array(data_array, x_title, y_title):
+    import matplotlib.pyplot as plt
+    x = range(len(data_array))
+    y = data_array
+    plt.plot(x, y)
+    plt.xlabel(x_title)
+    plt.ylabel(y_title)
+    plt.show()
+
+
 
 if __name__ == '__main__':
-    train_log_linear_with_one_hot()
-    # train_log_linear_with_w2v()
+    # train_log_linear_with_one_hot()
+    train_log_linear_with_w2v()
     # train_lstm_with_w2v()
