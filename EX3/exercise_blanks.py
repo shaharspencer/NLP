@@ -316,13 +316,13 @@ class LogLinear(nn.Module):
     def predict(self, x):
         # verify later
         sigmoid = nn.Sigmoid()
-        return torch.round(sigmoid(x @ self._parameters["weights"] + self._parameters["bias"]))
+        return sigmoid(x @ self._parameters["weights"] + self._parameters["bias"])
 
 
 # ------------------------- training functions -------------
 
 
-def binary_accuracy(preds, y):
+def binary_accuracy(preds: np.ndarray, y: np.ndarray):
     """
     This method returns tha accuracy of the predictions, relative to the labels.
     You can choose whether to use numpy arrays or tensors here.
@@ -331,7 +331,7 @@ def binary_accuracy(preds, y):
     :return: scalar value - (<number of accurate predictions> / <number of examples>)
     """
     correct = np.sum(np.round(preds) == y)
-    return correct / preds
+    return correct / preds.size
 
 
 def train_epoch(model, data_iterator, optimizer, criterion: F.binary_cross_entropy_with_logits):
@@ -351,9 +351,8 @@ def train_epoch(model, data_iterator, optimizer, criterion: F.binary_cross_entro
         loss = criterion(input=prediction, target=batch_labels)
         # SHOULD THIS BE HERE??
         loss.backward()
-        optimizer.zero_grad()
         optimizer.step()
-        break
+        optimizer.zero_grad()
 
     return loss, binary_accuracy(prediction.detach().numpy(), batch_labels.detach().numpy())
 
@@ -366,7 +365,18 @@ def evaluate(model, data_iterator, criterion):
     :param criterion: the loss criterion used for evaluation
     :return: tuple of (average loss over all examples, average accuracy over all examples)
     """
-    return
+    pass
+    for batch in data_iterator:
+        batch_data, batch_labels = batch[0], batch[1]
+        prediction = model(batch_data)
+        # something weird here??
+        loss = criterion(input=prediction, target=batch_labels)
+        # SHOULD THIS BE HERE??
+        loss.backward()
+        # optimizer.step()
+        # optimizer.zero_grad()
+
+    return loss, binary_accuracy(prediction.detach().numpy(), batch_labels.detach().numpy())
 
 
 def get_predictions_for_data(model, data_iter):
@@ -398,8 +408,13 @@ def train_model(model: nn.Module, data_manager: DataManager, n_epochs, lr, weigh
     criterion = F.binary_cross_entropy_with_logits
     train_iterator = data_manager.get_torch_iterator(TRAIN)
 
+    loss_lst = []
+    accuracy_lst = []
+
     for _ in range(n_epochs):
-        train_epoch(model, train_iterator, adam_optimizer, criterion=criterion)
+        loss, accuracy = train_epoch(model, train_iterator, adam_optimizer, criterion=criterion)
+        loss_lst.append(loss)
+        accuracy_lst.append(accuracy)
 
     return
 
