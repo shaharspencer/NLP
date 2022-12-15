@@ -280,7 +280,7 @@ class DataManager():
     def get_labels(self, data_subset=TRAIN):
         """
         :param data_subset: one of TRAIN VAL and TEST
-        :return: numpy array with the labels of the requested part of the datset in the same order of the
+
         examples.
         """
         return np.array([sent.sentiment_class for sent in self.sentences[data_subset]])
@@ -427,11 +427,11 @@ def train_model(model: nn.Module, data_manager: DataManager, n_epochs, lr, weigh
 
     for _ in range(n_epochs):
         loss, accuracy = train_epoch(model, train_iterator, adam_optimizer, criterion=criterion)
-        train_loss_lst.append(loss)
+        train_loss_lst.append(loss.detach().numpy())
         train_accuracy_lst.append(accuracy)
 
         loss, accuracy = evaluate(model, validation_iterator, criterion)
-        valid_loss_lst.append(loss)
+        valid_loss_lst.append(loss.detach().numpy())
         valid_accuracy_lst.append(accuracy)
 
     draw_two_subgraphs(train_loss_lst, "train loss",valid_loss_lst, "Validation loss", "loss")
@@ -471,6 +471,7 @@ def train_lstm_with_w2v():
     Here comes your code for training and evaluation of the LSTM model.
     """
     return
+
 
 def draw_two_subgraphs(arr1, arr1_label, arr2, arr2_label, loss_or_accuracy):
     import matplotlib.pyplot as plt
