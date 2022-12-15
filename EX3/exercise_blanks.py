@@ -115,7 +115,17 @@ def get_w2v_average(sent, word_to_vec, embedding_dim):
     :param embedding_dim: the dimension of the word embedding vectors
     :return The average embedding vector as numpy ndarray.
     """
-    return
+
+    return_vec = np.zeros(embedding_dim)
+    for token in sent.text:
+        try:
+            token_mapping = word_to_vec[token]
+            return_vec += token_mapping
+        except KeyError:
+            return_vec += np.zeros(embedding_dim)
+    average_vector = return_vec / return_vec.shape
+    return average_vector
+
 
 
 def get_one_hot(size, ind):
@@ -440,7 +450,12 @@ def train_log_linear_with_w2v():
     Here comes your code for training and evaluation of the log linear model with word embeddings
     representation.
     """
-    return
+    dataManager = DataManager(W2V_AVERAGE, batch_size=64)
+    it = dataManager.get_torch_iterator(TRAIN)
+    logLinearModel = LogLinear(embedding_dim=16271)
+    train_model(logLinearModel, dataManager, n_epochs=20, lr=0.01,
+                weight_decay=0.001)
+
 
 
 def train_lstm_with_w2v():
