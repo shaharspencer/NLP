@@ -148,12 +148,12 @@ def average_one_hots(sent, word_to_ind):
     :param word_to_ind: a mapping between words to indices
     :return:
     """
-    word_num = len(word_to_ind.keys())
-    return_vec = np.zeros(word_num)
+    word_num = len(sent.text) #len(word_to_ind.keys())
+    return_vec = np.zeros(len(word_to_ind.keys()))
     for token in sent.text:
         try:
             token_ind = word_to_ind[token]
-            one_hot_rep = get_one_hot(word_num, token_ind)
+            one_hot_rep = get_one_hot(len(word_to_ind.keys()), token_ind)
             return_vec += one_hot_rep
         except KeyError:
             print("average one hots - tried to access word_to_ind with word that does not exist")
@@ -317,8 +317,8 @@ class LogLinear(nn.Module):
     def __init__(self, embedding_dim):
 
         super().__init__()
-        self._parameters = {"weights": torch.randn(embedding_dim, requires_grad=True, dtype=torch.float64),
-                            "bias": torch.randn(1, requires_grad=True, dtype=torch.float64)}
+        self._parameters = {"weights": torch.randn(embedding_dim, requires_grad=True, dtype=torch.float64)}#,
+                            #"bias": torch.randn(1, requires_grad=True, dtype=torch.float64)}
 
     def forward(self, x):
         return x @ self._parameters["weights"] + self._parameters["bias"]
@@ -326,7 +326,7 @@ class LogLinear(nn.Module):
     def predict(self, x):
         # verify later
         sigmoid = nn.Sigmoid()
-        return sigmoid(x @ self._parameters["weights"] + self._parameters["bias"])
+        return sigmoid(x @ self._parameters["weights"]) + self._parameters["bias"]
 
 
 # ------------------------- training functions -------------
@@ -356,13 +356,11 @@ def train_epoch(model, data_iterator, optimizer, criterion: F.binary_cross_entro
     # iterate over data
     for batch in data_iterator:
         batch_data, batch_labels = batch[0], batch[1]
+        optimizer.zero_grad()
         prediction = model(batch_data)
-        # something weird here??
         loss = criterion(input=prediction, target=batch_labels)
-        # SHOULD THIS BE HERE??
         loss.backward()
         optimizer.step()
-        optimizer.zero_grad()
 
     return loss, binary_accuracy(prediction.detach().numpy(), batch_labels.detach().numpy())
 
@@ -412,16 +410,24 @@ def train_model(model: nn.Module, data_manager: DataManager, n_epochs, lr, weigh
     # NEEDS TO RECIEVE PARAMETERS BEFORE???
     criterion = F.binary_cross_entropy_with_logits
     train_iterator = data_manager.get_torch_iterator(TRAIN)
+    validation_iterator = data_manager.get_torch_iterator(VAL)
 
-    loss_lst = []
-    accuracy_lst = []
+    train_loss_lst = []
+    train_accuracy_lst = []
+
+    valid_loss_lst = []
+    valid_accuracy_lst = []
 
     for _ in range(n_epochs):
         loss, accuracy = train_epoch(model, train_iterator, adam_optimizer, criterion=criterion)
-        loss_lst.append(loss)
-        accuracy_lst.append(accuracy)
+        train_loss_lst.append(loss)
+        train_accuracy_lst.append(accuracy)
 
-    return
+        loss, accuracy = evaluate(model, validation_iterator, criterion)
+        valid_loss_lst.append(loss)
+        valid_accuracy_lst.append(accuracy)
+
+        print(loss, accuracy)
 
 
 def train_log_linear_with_one_hot():
@@ -463,3 +469,14 @@ if __name__ == '__main__':
     train_log_linear_with_one_hot()
     # train_log_linear_with_w2v()
     # train_lstm_with_w2v()
+
+
+def draw_two_subgraphs(arr1, arr1_label, arr2, arr2_label, loss_or_accuracy):
+    import matplotlib.pyplot as plt
+    t = np.arange(0, len(arr1), 1)
+    plt.plot(t, arr1, label = arr1_label)
+    plt.plot(t, arr2, label=arr2_label)
+    plt.legend(loc='best')
+    plt.xlabel("epoch #")
+    plt.ylabel(loss_or_accuracy)
+    plt.show()
