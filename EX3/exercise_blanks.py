@@ -9,7 +9,7 @@ import operator
 import data_loader
 import pickle
 import tqdm
-from torch.autograd import Variable
+
 # ------------------------------------------- Constants ----------------------------------------
 
 SEQ_LEN = 52
@@ -307,11 +307,11 @@ class LogLinear(nn.Module):
     def __init__(self, embedding_dim):
 
         super().__init__()
-        self._parameters = {"weights": torch.FloatTensor(np.ones(embedding_dim)),
-                            "bias": torch.tensor(0.1)}
+        self._parameters = {"weights": torch.randn(embedding_dim, requires_grad=True, dtype=torch.float64),
+                            "bias": torch.randn(1, requires_grad=True, dtype=torch.float64)}
 
     def forward(self, x):
-        return x.float() @ self._parameters["weights"] + self._parameters["bias"]
+        return x @ self._parameters["weights"] + self._parameters["bias"]
 
     def predict(self, x):
         # verify later
@@ -330,9 +330,8 @@ def binary_accuracy(preds, y):
     :param y: a vector of true labels
     :return: scalar value - (<number of accurate predictions> / <number of examples>)
     """
-    number_of_labels = y.shape[0]
-
-    return
+    correct = np.sum(np.round(preds) == y)
+    return correct / preds
 
 
 def train_epoch(model, data_iterator, optimizer, criterion: F.binary_cross_entropy_with_logits):
@@ -349,12 +348,14 @@ def train_epoch(model, data_iterator, optimizer, criterion: F.binary_cross_entro
         batch_data, batch_labels = batch[0], batch[1]
         prediction = model(batch_data)
         # something weird here??
-        loss = criterion(input=Variable(prediction, requires_grad=True), target=Variable(batch_labels, requires_grad=True))
+        loss = criterion(input=prediction, target=batch_labels)
         # SHOULD THIS BE HERE??
         loss.backward()
         optimizer.zero_grad()
         optimizer.step()
-    return
+        break
+
+    return loss, binary_accuracy(prediction.detach().numpy(), batch_labels.detach().numpy())
 
 
 def evaluate(model, data_iterator, criterion):
@@ -411,7 +412,7 @@ def train_log_linear_with_one_hot():
     dataManager = DataManager(ONEHOT_AVERAGE, batch_size=64)
 
     # find out what this is
-    logLinearModel = LogLinear(embedding_dim=16271)
+    logLinearModel = LogLinear(embedding_dim=len(list(dataManager.sentiment_dataset.get_word_counts())))
 
     train_model(logLinearModel, dataManager, n_epochs=20, lr=0.01, weight_decay=0.001)
 
