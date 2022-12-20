@@ -127,7 +127,6 @@ def get_w2v_average(sent, word_to_vec, embedding_dim):
     return average_vector
 
 
-
 def get_one_hot(size, ind):
     """
     this method returns a one-hot vector of the given size, where the 1 is placed in the ind entry.
@@ -148,18 +147,14 @@ def average_one_hots(sent, word_to_ind):
     :param word_to_ind: a mapping between words to indices
     :return:
     """
-    word_num = len(sent.text) #len(word_to_ind.keys())
-    return_vec = np.zeros(len(word_to_ind.keys()))
-    for token in sent.text:
-        try:
-            token_ind = word_to_ind[token]
-            one_hot_rep = get_one_hot(len(word_to_ind.keys()), token_ind)
-            return_vec += one_hot_rep
-        except KeyError:
-            print("average one hots - tried to access word_to_ind with word that does not exist")
-            exit(1)
-    average_vector = return_vec / word_num
-    return average_vector
+    word_num = len(sent.text)
+    try:
+        token_lst = [word_to_ind[token] for token in sent.text]
+        return get_one_hot(len(word_to_ind.keys()), token_lst) / word_num
+
+    except KeyError:
+        print("average one hots - tried to access word_to_ind with word that does not exist")
+        exit(1)
 
 
 def get_word_to_ind(words_list):
@@ -221,7 +216,8 @@ class DataManager():
     evaluation.
     """
 
-    def __init__(self, data_type=ONEHOT_AVERAGE, use_sub_phrases=True, dataset_path="stanfordSentimentTreebank", batch_size=50,
+    def __init__(self, data_type=ONEHOT_AVERAGE, use_sub_phrases=True, dataset_path="stanfordSentimentTreebank",
+                 batch_size=50,
                  embedding_dim=None):
         """
         builds the data manager used for training and evaluation.
@@ -292,14 +288,13 @@ class DataManager():
         return self.torch_datasets[TRAIN][0][0].shape
 
 
-
-
 # ------------------------------------ Models ----------------------------------------------------
 
 class LSTM(nn.Module):
     """
     An LSTM for sentiment analysis with architecture as described in the exercise description.
     """
+
     def __init__(self, embedding_dim, hidden_dim, n_layers, dropout):
         return
 
@@ -314,8 +309,8 @@ class LogLinear(nn.Module):
     """
     general class for the log-linear models for sentiment analysis.
     """
-    def __init__(self, embedding_dim):
 
+    def __init__(self, embedding_dim):
         super().__init__()
         self._parameters = {"weights": torch.randn(embedding_dim, requires_grad=True, dtype=torch.float64),
                             "bias": torch.randn(1, requires_grad=True, dtype=torch.float64)}
@@ -377,7 +372,6 @@ def evaluate(model, data_iterator, criterion):
         for batch in data_iterator:
             batch_data, batch_labels = batch[0], batch[1]
             prediction = model(batch_data)
-            # something weird here??
             loss = criterion(input=prediction, target=batch_labels)
 
         return loss, binary_accuracy(prediction.detach().numpy(), batch_labels.detach().numpy())
@@ -399,7 +393,6 @@ def get_predictions_for_data(model, data_iter):
             predictions = np.concatenate(predictions, model.predict(batch_data))
 
     return predictions
-
 
 
 def train_model(model: nn.Module, data_manager: DataManager, n_epochs, lr, weight_decay=0.):
@@ -434,8 +427,8 @@ def train_model(model: nn.Module, data_manager: DataManager, n_epochs, lr, weigh
         valid_loss_lst.append(loss.detach().numpy())
         valid_accuracy_lst.append(accuracy)
 
-    draw_two_subgraphs(train_loss_lst, "train loss",valid_loss_lst, "Validation loss", "loss")
-    draw_two_subgraphs(train_accuracy_lst, "train accuracy",  valid_accuracy_lst, "Validation accuracy", "accuracy")
+    draw_two_subgraphs(train_loss_lst, "train loss", valid_loss_lst, "Validation loss", "loss")
+    draw_two_subgraphs(train_accuracy_lst, "train accuracy", valid_accuracy_lst, "Validation accuracy", "accuracy")
 
 
 def train_log_linear_with_one_hot():
@@ -450,8 +443,6 @@ def train_log_linear_with_one_hot():
 
     train_model(logLinearModel, dataManager, n_epochs=20, lr=0.01, weight_decay=0.001)
 
-    return
-
 
 def train_log_linear_with_w2v():
     """
@@ -459,11 +450,8 @@ def train_log_linear_with_w2v():
     representation.
     """
     dataManager = DataManager(W2V_AVERAGE, batch_size=64)
-    it = dataManager.get_torch_iterator(TRAIN)
-    logLinearModel = LogLinear(embedding_dim=16271)
-    train_model(logLinearModel, dataManager, n_epochs=20, lr=0.01,
-                weight_decay=0.001)
-
+    logLinearModel = LogLinear(embedding_dim=300)
+    train_model(logLinearModel, dataManager, n_epochs=20, lr=0.01, weight_decay=0.001)
 
 
 def train_lstm_with_w2v():
@@ -476,7 +464,7 @@ def train_lstm_with_w2v():
 def draw_two_subgraphs(arr1, arr1_label, arr2, arr2_label, loss_or_accuracy):
     import matplotlib.pyplot as plt
     t = np.arange(0, len(arr1), 1)
-    plt.plot(t, arr1, label = arr1_label)
+    plt.plot(t, arr1, label=arr1_label)
     plt.plot(t, arr2, label=arr2_label)
     plt.legend(loc='best')
     plt.xlabel("epoch #")
@@ -485,8 +473,6 @@ def draw_two_subgraphs(arr1, arr1_label, arr2, arr2_label, loss_or_accuracy):
 
 
 if __name__ == '__main__':
-    train_log_linear_with_one_hot()
-    # train_log_linear_with_w2v()
+    #train_log_linear_with_one_hot()
+    train_log_linear_with_w2v()
     # train_lstm_with_w2v()
-
-

@@ -339,8 +339,6 @@ def get_rare_words_examples(sentences_list, dataset: SentimentTreeBank,
     return indices[:num_sentences]
 
 
-
-
 if __name__ == '__main__':
     # examples for reading the sentiment dataset
     dataset = SentimentTreeBank()
