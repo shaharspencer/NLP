@@ -9,6 +9,7 @@ import operator
 import data_loader
 import pickle
 import tqdm
+import gensim
 
 # ------------------------------------------- Constants ----------------------------------------
 
@@ -88,7 +89,7 @@ def load_word2vec():
     return wv_from_bin
 
 
-def create_or_load_slim_w2v(words_list, cache_w2v=False):
+def create_or_load_slim_w2v(words_list, cache_w2v=True):
     """
     returns word2vec dict only for words which appear in the dataset.
     :param words_list: list of words to use for the w2v dict
@@ -115,16 +116,18 @@ def get_w2v_average(sent, word_to_vec, embedding_dim):
     :param embedding_dim: the dimension of the word embedding vectors
     :return The average embedding vector as numpy ndarray.
     """
-
+    known_words = 0
     return_vec = np.zeros(embedding_dim)
     for token in sent.text:
         try:
             token_mapping = word_to_vec[token]
             return_vec += token_mapping
+            known_words += 1
         except KeyError:
-            return_vec += np.zeros(embedding_dim)
-    average_vector = return_vec / return_vec.shape
-    return average_vector
+            # return_vec += np.zeros(embedding_dim)
+            pass
+
+    return return_vec / known_words
 
 
 def get_one_hot(size, ind):
@@ -348,16 +351,23 @@ def train_epoch(model, data_iterator, optimizer, criterion: F.binary_cross_entro
     :param optimizer: the optimizer object for the training process.
     :param criterion: the criterion object for the training process.
     """
-    # iterate over data
+    # iterate over data)
+    total_loss = 0
+    accuracy = 0
+    batch_num = 0
     for batch in data_iterator:
         batch_data, batch_labels = batch[0], batch[1]
         optimizer.zero_grad()
-        prediction = model(batch_data)
-        loss = criterion(input=prediction, target=batch_labels)
+        forwardPrediction = model(batch_data)
+        prediction = nn.Sigmoid()(forwardPrediction)
+        loss = criterion(input=forwardPrediction, target=batch_labels)
         loss.backward()
+        total_loss += loss.item()
         optimizer.step()
+        batch_num += 1
+        accuracy += binary_accuracy(prediction.detach().numpy(), batch_labels.detach().numpy())
 
-    return loss, binary_accuracy(prediction.detach().numpy(), batch_labels.detach().numpy())
+    return total_loss / batch_num, accuracy / batch_num
 
 
 def evaluate(model, data_iterator, criterion):
@@ -369,12 +379,19 @@ def evaluate(model, data_iterator, criterion):
     :return: tuple of (average loss over all examples, average accuracy over all examples)
     """
     with torch.no_grad():
+        accuracy = 0
+        total_loss = 0
+        batch_num = 0
         for batch in data_iterator:
+            batch_num += 1
             batch_data, batch_labels = batch[0], batch[1]
-            prediction = model(batch_data)
-            loss = criterion(input=prediction, target=batch_labels)
+            forwardPrediction = model(batch_data)
+            predictions = nn.Sigmoid()(forwardPrediction)
+            loss = criterion(input=forwardPrediction, target=batch_labels)
+            total_loss += loss.item()
+            accuracy += binary_accuracy(predictions.detach().numpy(), batch_labels.detach().numpy())
 
-        return loss, binary_accuracy(prediction.detach().numpy(), batch_labels.detach().numpy())
+        return total_loss / batch_num, accuracy / batch_num
 
 
 def get_predictions_for_data(model, data_iter):
@@ -420,11 +437,11 @@ def train_model(model: nn.Module, data_manager: DataManager, n_epochs, lr, weigh
 
     for _ in range(n_epochs):
         loss, accuracy = train_epoch(model, train_iterator, adam_optimizer, criterion=criterion)
-        train_loss_lst.append(loss.detach().numpy())
+        train_loss_lst.append(loss)
         train_accuracy_lst.append(accuracy)
 
         loss, accuracy = evaluate(model, validation_iterator, criterion)
-        valid_loss_lst.append(loss.detach().numpy())
+        valid_loss_lst.append(loss)
         valid_accuracy_lst.append(accuracy)
 
     draw_two_subgraphs(train_loss_lst, "train loss", valid_loss_lst, "Validation loss", "loss")
