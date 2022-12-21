@@ -5,6 +5,7 @@
       <excludeFolder url="file://$MODULE_DIR$/venv" />
       <excludeFolder url="file://$MODULE_DIR$/Interpeter" />
     </content>
+    <content url="file://$USER_HOME$/gensim-data" />
     <orderEntry type="jdk" jdkName="Python 3.9 (NLP)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>

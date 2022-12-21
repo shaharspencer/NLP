@@ -9,7 +9,6 @@ import operator
 import data_loader
 import pickle
 import tqdm
-import gensim
 
 # ------------------------------------------- Constants ----------------------------------------
 
@@ -83,9 +82,9 @@ def load_word2vec():
     """
     import gensim.downloader as api
     wv_from_bin = api.load("word2vec-google-news-300")
-    vocab = list(wv_from_bin.vocab.keys())
-    print(wv_from_bin.vocab[vocab[0]])
-    print("Loaded vocab size %i" % len(vocab))
+    # vocab = list(wv_from_bin.vocab.keys())
+    # print(wv_from_bin.vocab[vocab[0]])
+    # print("Loaded vocab size %i" % len(vocab))
     return wv_from_bin
 
 
@@ -124,10 +123,11 @@ def get_w2v_average(sent, word_to_vec, embedding_dim):
             return_vec += token_mapping
             known_words += 1
         except KeyError:
-            # return_vec += np.zeros(embedding_dim)
             pass
 
-    return return_vec / known_words
+    if known_words:
+        return return_vec / known_words
+    return return_vec
 
 
 def get_one_hot(size, ind):
@@ -175,7 +175,7 @@ def get_word_to_ind(words_list):
     return word_mapping
 
 
-def sentence_to_embedding(sent, word_to_vec, seq_len, embedding_dim=300):
+def sentence_to_embedding(sent: data_loader.Sentence, word_to_vec, seq_len, embedding_dim=300):
     """
     this method gets a sentence and a word to vector mapping, and returns a list containing the
     words embeddings of the tokens in the sentence.
@@ -185,7 +185,26 @@ def sentence_to_embedding(sent, word_to_vec, seq_len, embedding_dim=300):
     :param embedding_dim: the dimension of the w2v embedding
     :return: numpy ndarray of shape (seq_len, embedding_dim) with the representation of the sentence
     """
-    return
+    word_num = len(sent.text)
+
+    if word_num == seq_len:
+        padded_sent = sent.text
+
+    elif word_num > seq_len:
+        padded_sent = sent.text[:seq_len]
+
+    else:
+        padded_sent = sent.text + [0 for _ in range(seq_len - len(sent.text))]
+
+    sent_rep = np.zeros((seq_len, embedding_dim))
+
+    for idx, word in enumerate(padded_sent):
+        try:
+            sent_rep[idx] = word_to_vec[word]
+        except KeyError:
+            pass
+
+    return sent_rep
 
 
 class OnlineDataset(Dataset):
@@ -299,10 +318,24 @@ class LSTM(nn.Module):
     """
 
     def __init__(self, embedding_dim, hidden_dim, n_layers, dropout):
-        return
+        super().__init__()
+        self.n_layers = n_layers
+        self.hidden_dim = hidden_dim
+
+        self.lstm = nn.LSTM(input_size=embedding_dim, hidden_size=hidden_dim,
+                            num_layers=n_layers, bidirectional=True, batch_first=True)
+
+        self.dropout = nn.Dropout(p=dropout)
+
+        self.linear = nn.Linear(hidden_dim * 2, 1, bias=True)
 
     def forward(self, text):
-        return
+        h0 = torch.zeros(2 * self.n_layers, text.shape[0], self.hidden_dim)
+        c0 = torch.zeros(2 * self.n_layers, text.shape[0], self.hidden_dim)
+        _, (hn, cn) = self.lstm(text.float(), (h0, c0))
+        regularized = self.dropout(hn)
+        concat = torch.cat((regularized[0], regularized[1]), dim=1)
+        return self.linear(concat).squeeze()
 
     def predict(self, text):
         return
@@ -428,6 +461,7 @@ def train_model(model: nn.Module, data_manager: DataManager, n_epochs, lr, weigh
     criterion = F.binary_cross_entropy_with_logits
     train_iterator = data_manager.get_torch_iterator(TRAIN)
     validation_iterator = data_manager.get_torch_iterator(VAL)
+    print(len(validation_iterator), len(train_iterator))
 
     train_loss_lst = []
     train_accuracy_lst = []
@@ -466,7 +500,7 @@ def train_log_linear_with_w2v():
     Here comes your code for training and evaluation of the log linear model with word embeddings
     representation.
     """
-    dataManager = DataManager(W2V_AVERAGE, batch_size=64)
+    dataManager = DataManager(W2V_AVERAGE, batch_size=64, embedding_dim=300)
     logLinearModel = LogLinear(embedding_dim=300)
     train_model(logLinearModel, dataManager, n_epochs=20, lr=0.01, weight_decay=0.001)
 
@@ -475,7 +509,9 @@ def train_lstm_with_w2v():
     """
     Here comes your code for training and evaluation of the LSTM model.
     """
-    return
+    dataManager = DataManager(W2V_SEQUENCE, batch_size=64, embedding_dim=300)
+    lstmModel = LSTM(300, 100, 1, 0.5)
+    train_model(lstmModel, dataManager, n_epochs=4, lr=0.001, weight_decay=0.0001)
 
 
 def draw_two_subgraphs(arr1, arr1_label, arr2, arr2_label, loss_or_accuracy):
@@ -492,4 +528,4 @@ def draw_two_subgraphs(arr1, arr1_label, arr2, arr2_label, loss_or_accuracy):
 if __name__ == '__main__':
     #train_log_linear_with_one_hot()
     train_log_linear_with_w2v()
-    # train_lstm_with_w2v()
+    #train_lstm_with_w2v()
