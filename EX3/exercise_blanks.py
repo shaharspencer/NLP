@@ -389,6 +389,8 @@ def train_epoch(model, data_iterator, optimizer, criterion: F.binary_cross_entro
     accuracy = 0
     batch_num = 0
     for batch in data_iterator:
+        if batch[0].shape[0] != 64:
+            continue
         batch_data, batch_labels = batch[0], batch[1]
         optimizer.zero_grad()
         forwardPrediction = model(batch_data)
@@ -416,6 +418,8 @@ def evaluate(model, data_iterator, criterion):
         total_loss = 0
         batch_num = 0
         for batch in data_iterator:
+            if batch[0].shape[0] != 64:
+                continue
             batch_num += 1
             batch_data, batch_labels = batch[0], batch[1]
             forwardPrediction = model(batch_data)
@@ -461,7 +465,6 @@ def train_model(model: nn.Module, data_manager: DataManager, n_epochs, lr, weigh
     criterion = F.binary_cross_entropy_with_logits
     train_iterator = data_manager.get_torch_iterator(TRAIN)
     validation_iterator = data_manager.get_torch_iterator(VAL)
-    print(len(validation_iterator), len(train_iterator))
 
     train_loss_lst = []
     train_accuracy_lst = []
@@ -494,6 +497,8 @@ def train_log_linear_with_one_hot():
 
     train_model(logLinearModel, dataManager, n_epochs=20, lr=0.01, weight_decay=0.001)
 
+    return logLinearModel
+
 
 def train_log_linear_with_w2v():
     """
@@ -504,6 +509,8 @@ def train_log_linear_with_w2v():
     logLinearModel = LogLinear(embedding_dim=300)
     train_model(logLinearModel, dataManager, n_epochs=20, lr=0.01, weight_decay=0.001)
 
+    return logLinearModel
+
 
 def train_lstm_with_w2v():
     """
@@ -512,6 +519,8 @@ def train_lstm_with_w2v():
     dataManager = DataManager(W2V_SEQUENCE, batch_size=64, embedding_dim=300)
     lstmModel = LSTM(300, 100, 1, 0.5)
     train_model(lstmModel, dataManager, n_epochs=4, lr=0.001, weight_decay=0.0001)
+
+    return lstmModel
 
 
 def draw_two_subgraphs(arr1, arr1_label, arr2, arr2_label, loss_or_accuracy):
@@ -525,7 +534,55 @@ def draw_two_subgraphs(arr1, arr1_label, arr2, arr2_label, loss_or_accuracy):
     plt.show()
 
 
+def test_model(model: nn.Module, data_type, criterion=F.binary_cross_entropy_with_logits):
+    if data_type == ONEHOT_AVERAGE:
+        dataManager = DataManager(ONEHOT_AVERAGE, batch_size=64)
+    elif data_type == W2V_AVERAGE:
+        dataManager = DataManager(W2V_AVERAGE, batch_size=64, embedding_dim=300)
+    else:
+        dataManager = DataManager(W2V_SEQUENCE, batch_size=64, embedding_dim=300)
+
+    test_iterator = dataManager.get_torch_iterator(TEST)
+    loss, accuracy = evaluate(model, test_iterator, criterion)
+    print("Loss: ", loss, "Accuracy: ", accuracy)
+
+
+def test_model_special_subsets(model: nn.Module, data_type, criterion=F.binary_cross_entropy_with_logits):
+    if data_type == ONEHOT_AVERAGE:
+        dataManager = DataManager(ONEHOT_AVERAGE, batch_size=1)
+    elif data_type == W2V_AVERAGE:
+        dataManager = DataManager(W2V_AVERAGE, batch_size=1, embedding_dim=300)
+    else:
+        dataManager = DataManager(W2V_SEQUENCE, batch_size=1, embedding_dim=300)
+
+    test_labels = [dataManager.sentences[TEST][i].sentiment_class for i in range(len(dataManager.sentences[TEST]))]
+    test_iterator = dataManager.get_torch_iterator(TEST)
+    test_sents = dataManager.get_torch_iterator()
+    negated_polarity_idxs = data_loader.get_negated_polarity_examples(test_sents)
+    negated_polarity_data = [test_sents[i] for i in negated_polarity_idxs]
+    negated_polarity_sents, negated_polarity_labels = zip(*negated_polarity_data)
+    negated_prediction = nn.Sigmoid()(model(negated_polarity_sents))
+
+    print("Accuracy for negated: ", binary_accuracy(negated_prediction, negated_polarity_labels))
+
+    rare_words_idxs = data_loader.get_rare_words_examples(test_sents, dataManager.sentiment_dataset)
+    rare_words_data = [test_sents[i] for i in rare_words_idxs]
+    rare_words_sents, rare_words_label = zip(*rare_words_data)
+    rare_prediction = nn.Sigmoid()(model(rare_words_sents))
+
+    print("Accuracy for rare words: ", binary_accuracy(rare_prediction, rare_words_label))
+
+
 if __name__ == '__main__':
-    #train_log_linear_with_one_hot()
-    train_log_linear_with_w2v()
-    #train_lstm_with_w2v()
+    logLinearModel = train_log_linear_with_one_hot()
+    #logLinearModelW2V = train_log_linear_with_w2v()
+    #lstmModel = train_lstm_with_w2v()
+
+    test_model(logLinearModel, ONEHOT_AVERAGE)
+    #test_model(logLinearModelW2V, W2V_AVERAGE)
+    #test_model(lstmModel, W2V_SEQUENCE)
+
+    test_model_special_subsets(logLinearModel, ONEHOT_AVERAGE)
+
+
+
