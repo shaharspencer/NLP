@@ -387,22 +387,20 @@ def train_epoch(model, data_iterator, optimizer, criterion: F.binary_cross_entro
     # iterate over data)
     total_loss = 0
     accuracy = 0
-    batch_num = 0
+    total_samples = 0
     for batch in data_iterator:
-        if batch[0].shape[0] != 64:
-            continue
         batch_data, batch_labels = batch[0], batch[1]
         optimizer.zero_grad()
         forwardPrediction = model(batch_data)
         prediction = nn.Sigmoid()(forwardPrediction)
         loss = criterion(input=forwardPrediction, target=batch_labels)
         loss.backward()
-        total_loss += loss.item()
+        total_loss += loss.item() * batch[0].shape[0]
         optimizer.step()
-        batch_num += 1
-        accuracy += binary_accuracy(prediction.detach().numpy(), batch_labels.detach().numpy())
+        total_samples += batch[0].shape[0]
+        accuracy += binary_accuracy(prediction.detach().numpy(), batch_labels.detach().numpy()) * batch[0].shape[0]
 
-    return total_loss / batch_num, accuracy / batch_num
+    return total_loss / total_samples, accuracy / total_samples
 
 
 def evaluate(model, data_iterator, criterion):
@@ -416,19 +414,17 @@ def evaluate(model, data_iterator, criterion):
     with torch.no_grad():
         accuracy = 0
         total_loss = 0
-        batch_num = 0
+        total_samples = 0
         for batch in data_iterator:
-            if batch[0].shape[0] != 64:
-                continue
-            batch_num += 1
+            total_samples += batch[0].shape[0]
             batch_data, batch_labels = batch[0], batch[1]
             forwardPrediction = model(batch_data)
             predictions = nn.Sigmoid()(forwardPrediction)
             loss = criterion(input=forwardPrediction, target=batch_labels)
-            total_loss += loss.item()
-            accuracy += binary_accuracy(predictions.detach().numpy(), batch_labels.detach().numpy())
+            total_loss += loss.item() * batch[0].shape[0]
+            accuracy += binary_accuracy(predictions.detach().numpy(), batch_labels.detach().numpy()) * batch[0].shape[0]
 
-        return total_loss / batch_num, accuracy / batch_num
+        return total_loss / total_samples, accuracy / total_samples
 
 
 def get_predictions_for_data(model, data_iter):
@@ -525,11 +521,16 @@ def train_lstm_with_w2v():
 
 def draw_two_subgraphs(arr1, arr1_label, arr2, arr2_label, loss_or_accuracy):
     import matplotlib.pyplot as plt
-    t = np.arange(0, len(arr1), 1)
+    t = np.arange(1, len(arr1) + 1)
     plt.plot(t, arr1, label=arr1_label)
     plt.plot(t, arr2, label=arr2_label)
     plt.legend(loc='best')
-    plt.xlabel("epoch #")
+    plt.xlabel("epoch")
+    if len(arr1) > 4:
+        plt.xticks(np.arange(1, len(arr1) + 1, 2))
+    else:
+        plt.xticks(np.arange(1, len(arr1) + 1))
+
     plt.ylabel(loss_or_accuracy)
     plt.show()
 
@@ -547,42 +548,62 @@ def test_model(model: nn.Module, data_type, criterion=F.binary_cross_entropy_wit
     print("Loss: ", loss, "Accuracy: ", accuracy)
 
 
-def test_model_special_subsets(model: nn.Module, data_type, criterion=F.binary_cross_entropy_with_logits):
+def test_model_special_subsets(model: nn.Module, data_type):
     if data_type == ONEHOT_AVERAGE:
-        dataManager = DataManager(ONEHOT_AVERAGE, batch_size=1)
+        dataManager = DataManager(ONEHOT_AVERAGE, batch_size=962)
     elif data_type == W2V_AVERAGE:
-        dataManager = DataManager(W2V_AVERAGE, batch_size=1, embedding_dim=300)
+        dataManager = DataManager(W2V_AVERAGE, batch_size=962, embedding_dim=300)
     else:
-        dataManager = DataManager(W2V_SEQUENCE, batch_size=1, embedding_dim=300)
+        dataManager = DataManager(W2V_SEQUENCE, batch_size=962, embedding_dim=300)
 
-    test_labels = [dataManager.sentences[TEST][i].sentiment_class for i in range(len(dataManager.sentences[TEST]))]
+
     test_iterator = dataManager.get_torch_iterator(TEST)
-    test_sents = dataManager.get_torch_iterator()
-    negated_polarity_idxs = data_loader.get_negated_polarity_examples(test_sents)
-    negated_polarity_data = [test_sents[i] for i in negated_polarity_idxs]
-    negated_polarity_sents, negated_polarity_labels = zip(*negated_polarity_data)
+    test_sents_and_res = [batch for batch in test_iterator][0]
+
+    negated_polarity_idxs = data_loader.get_negated_polarity_examples(
+        test_iterator.dataset.data)
+
+    negated_polarity_sents = torch.index_select(test_sents_and_res[0], 0,
+                                                torch.tensor(negated_polarity_idxs))
+
+    negated_polarity_labels = torch.index_select(test_sents_and_res[1], 0,
+                                                torch.tensor(negated_polarity_idxs)).detach().numpy()
+
+
     negated_prediction = nn.Sigmoid()(model(negated_polarity_sents))
 
-    print("Accuracy for negated: ", binary_accuracy(negated_prediction, negated_polarity_labels))
 
-    rare_words_idxs = data_loader.get_rare_words_examples(test_sents, dataManager.sentiment_dataset)
-    rare_words_data = [test_sents[i] for i in rare_words_idxs]
-    rare_words_sents, rare_words_label = zip(*rare_words_data)
-    rare_prediction = nn.Sigmoid()(model(rare_words_sents))
+    print("Accuracy for negated: ", binary_accuracy(negated_prediction.detach().numpy(),
+                                                    negated_polarity_labels))
 
-    print("Accuracy for rare words: ", binary_accuracy(rare_prediction, rare_words_label))
+    rare_words_idxs = data_loader.get_rare_words_examples(
+        test_iterator.dataset.data, dataManager.sentiment_dataset)
+
+    rare_sents = torch.index_select(test_sents_and_res[0], 0,
+                                                torch.tensor(
+                                                    rare_words_idxs))
+
+    rare_labels = torch.index_select(test_sents_and_res[1], 0,
+                                                 torch.tensor(
+                                                     rare_words_idxs)).detach().numpy()
+
+    rare_prediction = nn.Sigmoid()(model(rare_sents))
+    print("Accuracy for rare words: ", binary_accuracy(rare_prediction.detach().numpy(), rare_labels))
 
 
 if __name__ == '__main__':
+
     logLinearModel = train_log_linear_with_one_hot()
-    #logLinearModelW2V = train_log_linear_with_w2v()
-    #lstmModel = train_lstm_with_w2v()
+    logLinearModelW2V = train_log_linear_with_w2v()
+    lstmModel = train_lstm_with_w2v()
 
     test_model(logLinearModel, ONEHOT_AVERAGE)
-    #test_model(logLinearModelW2V, W2V_AVERAGE)
-    #test_model(lstmModel, W2V_SEQUENCE)
+    test_model(logLinearModelW2V, W2V_AVERAGE)
+    test_model(lstmModel, W2V_SEQUENCE)
 
     test_model_special_subsets(logLinearModel, ONEHOT_AVERAGE)
+    test_model_special_subsets(logLinearModelW2V, W2V_AVERAGE)
+    test_model_special_subsets(lstmModel, W2V_SEQUENCE)
 
 
 
