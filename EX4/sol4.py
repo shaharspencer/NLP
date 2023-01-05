@@ -38,6 +38,7 @@ class MSTParser:
                         index += 1
 
     def feature_function(self, node1: dict, node2: dict) -> np.ndarray:
+
         feature_vec = np.zeros(len(self.feature_map))
         try:
             feature_vec[self.feature_map[node1["lemma"] + ":lemma:" + node2["lemma"]]] = 1
@@ -51,11 +52,14 @@ class MSTParser:
     def get_all_possible_arcs(self, sent: DependencyGraph, weights):
         arcs = []
         _, node_lst = zip(*list(sent.nodes.items()))
+        print("start")
+
         for i in range(len(node_lst)):
             for j in range(1, len(node_lst)):
                 if i == j:
                     continue
                 arcs.append(Arc(i, j, - (self.feature_function(node_lst[i], node_lst[j]) @ weights)))
+        print("end")
 
         return arcs
 
@@ -70,8 +74,14 @@ class MSTParser:
         weights_list = [np.zeros(len(self.feature_map))]
 
         for _ in range(n_iterations):
+            index = 0
             for sent in self.train_set:
-                mst = get_mst(self.get_all_possible_arcs(sent, weights_list[-1]), 0)  # get_mst(- , None)
+                if index % 5 == 0:
+                    print(index)
+                index += 1
+
+                possible = self.get_all_possible_arcs(sent, weights_list[-1])
+                mst = get_mst(possible, 0)  # get_mst(- , None)
                 weights_list.append(weights_list[-1] +
                                     lr * (self.sum_feature_func_over_arcs(sent.nx_graph().edges, sent) -
                                           self.sum_feature_func_over_arcs(mst.values(), sent)))
