@@ -62,7 +62,7 @@ class MSTParser:
         print("end")
 
         return arcs
-
+    #
     def sum_feature_func_over_arcs(self, arcs, sent: DependencyGraph):
         s = np.zeros(len(self.feature_map))
         _, node_lst = zip(*list(sent.nodes.items()))
