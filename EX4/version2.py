@@ -8,9 +8,7 @@ import random
 Arc = namedtuple("Arc", ["head", "tail", "weight"])
 
 
-def get_sent_root_tuple(sent: DependencyGraph, arc=False):
-    if arc:
-        return 0, sent.root["address"], 0
+def get_sent_root_tuple(sent: DependencyGraph):
     return 0, sent.root["address"]
 
 
@@ -77,8 +75,11 @@ class MSTParser:
 
         return arcs
 
-    def sum_feature_func_over_arcs(self, arcs, sent: DependencyGraph):
+    def sum_feature_func_mst(self, arcs, sent: DependencyGraph):
         return np.sum([self.feature_function(sent.nodes[arc[0]], sent.nodes[arc[1]]) for arc in arcs], axis=0)
+
+    def sum_feature_func_label(self, arcs, sent: DependencyGraph):
+        return np.sum([self.feature_function(sent.nodes[arc[1]], sent.nodes[arc[0]]) for arc in arcs], axis=0)
 
     def perceptron(self, lr: float, n_iterations: int) -> np.ndarray:
         weights = np.zeros(len(self.feature_map))
@@ -95,10 +96,11 @@ class MSTParser:
                 possible = self.get_all_possible_arcs(sent, weights)
                 mst = list(get_mst(possible, 0).values())
 
-                true_arcs = list(sent.nx_graph().edges) + [get_sent_root_tuple(sent, arc=True)]
+                true_root = get_sent_root_tuple(sent)
+                true_arcs = list(sent.nx_graph().edges) + [(true_root[1], true_root[0])]
 
-                weights += lr * (self.sum_feature_func_over_arcs(true_arcs, sent) -
-                                 self.sum_feature_func_over_arcs(mst, sent))
+                weights += lr * (self.sum_feature_func_label(true_arcs, sent) -
+                                 self.sum_feature_func_mst(mst, sent))
 
                 prev_weight_sum += weights
 
@@ -117,9 +119,8 @@ class MSTParser:
             mst = get_mst(arcs, 0)
             heads, tails, _ = zip(*mst.values())
             prediction = set(zip(heads, tails))
-            heads, tails, _ = zip(*sent.nx_graph().edges)
-            label = set(zip(heads, tails))
-            label.add(get_sent_root_tuple(sent))
+            tails, heads, _ = zip(*sent.nx_graph().edges)
+            label = set(list(zip(heads, tails)) + [get_sent_root_tuple(sent)])
             score += (len(prediction.intersection(label)) / len(label))
 
         return score / len(self.test_set)
