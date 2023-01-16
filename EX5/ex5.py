@@ -118,12 +118,15 @@ def transformer_classification(portion=1.):
         num_train_epochs=5,
     )
 
+    train_dataset = Dataset(tokenizer(x_train), tokenizer(y_train))
+    test_dataset = Dataset(tokenizer(x_test), y_test)
+
     trainer = Trainer(
         model=model,
         args=training_args,
-        train_dataset=(x_train, y_train),
-        eval_dataset=(x_test, y_test),
-        tokenizer=tokenizer
+        train_dataset=train_dataset,
+        eval_dataset=test_dataset
+        #tokenizer=tokenizer
     )
 
     trainer.train()
