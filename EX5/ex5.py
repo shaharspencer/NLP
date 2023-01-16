@@ -150,7 +150,15 @@ def zeroshot_classification(portion=1.):
 
     # Add your code here
     # see https://huggingface.co/docs/transformers/v4.25.1/en/main_classes/pipelines#transformers.ZeroShotClassificationPipeline
-    return
+    oracle = clf(x_test, candidate_labels=candidate_labels, top_k=1)
+    counter = 0
+    progress = 0
+    for i, item in enumerate(oracle):
+        progress += 1
+        if category_dict[item['answer']] == y_test[i]:
+            counter += 1
+
+    return counter / progress
 
 
 if __name__ == "__main__":
@@ -163,10 +171,10 @@ if __name__ == "__main__":
     #     print(linear_classification(p))
 
     # Q2
-    print("\nFinetuning results:")
-    for p in portions:
-        print(f"Portion: {p}")
-        print(transformer_classification(portion=p))
+    # print("\nFinetuning results:")
+    # for p in portions:
+    #     print(f"Portion: {p}")
+    #     print(transformer_classification(portion=p))
 
     # Q3
     print("\nZero-shot result:")
