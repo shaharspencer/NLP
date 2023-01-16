@@ -162,20 +162,38 @@ def zeroshot_classification(portion=1.):
     return counter / progress
 
 
+def plot_results(portions, accuracies, graph_title:str):
+    import matplotlib.pyplot as plt
+    plt.plot(portions, accuracies)
+    plt.xlabel('portion')
+    plt.ylabel('accuracy')
+    plt.title(graph_title + " - accuracy as function of portion size")
+    plt.show()
+
+
 if __name__ == "__main__":
     portions = [0.1, 0.5, 1.]
 
     # Q1
+    accuracies = []
     print("Logistic regression results:")
     for p in portions:
         print(f"Portion: {p}")
-        print(linear_classification(p))
+        acc = linear_classification(p)
+        print(acc)
+        accuracies.append(acc)
+    plot_results(portions, accuracies, "logistic regression")
 
     # Q2
+    accuracies = []
     print("\nFinetuning results:")
     for p in portions:
         print(f"Portion: {p}")
-        print(transformer_classification(portion=p))
+        acc = transformer_classification(portion=p)
+        print(acc)
+        accuracies.append(acc)
+    plot_results(portions, accuracies, "finetuning")
+
 
     # Q3
     print("\nZero-shot result:")
