@@ -145,7 +145,8 @@ def zeroshot_classification(portion=1.):
     from sklearn.metrics import accuracy_score
     import torch
     x_train, y_train, x_test, y_test = get_data(categories=category_dict.keys(), portion=portion)
-    clf = pipeline("zero-shot-classification", model='cross-encoder/nli-MiniLM2-L6-H768')
+    clf = pipeline("zero-shot-classification", model='cross-encoder/nli-MiniLM2-L6-H768',
+                   device=torch.device('cuda:0' if torch.cuda.is_available() else 'cpu'))
     candidate_labels = list(category_dict.values())
 
     # Add your code here
@@ -165,16 +166,16 @@ if __name__ == "__main__":
     portions = [0.1, 0.5, 1.]
 
     # Q1
-    # print("Logistic regression results:")
-    # for p in portions:
-    #     print(f"Portion: {p}")
-    #     print(linear_classification(p))
+    print("Logistic regression results:")
+    for p in portions:
+        print(f"Portion: {p}")
+        print(linear_classification(p))
 
     # Q2
-    # print("\nFinetuning results:")
-    # for p in portions:
-    #     print(f"Portion: {p}")
-    #     print(transformer_classification(portion=p))
+    print("\nFinetuning results:")
+    for p in portions:
+        print(f"Portion: {p}")
+        print(transformer_classification(portion=p))
 
     # Q3
     print("\nZero-shot result:")
