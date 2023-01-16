@@ -56,7 +56,12 @@ def linear_classification(portion=1.):
     x_train, y_train, x_test, y_test = get_data(categories=category_dict.keys(), portion=portion)
 
     # Add your code here
-    return
+    log_linear = LogisticRegression()
+    X_train = tf.fit_transform(x_train)
+    log_linear.fit(X_train, y_train)
+
+    X_test = tf.transform(x_test)
+    return log_linear.score(X_test, y_test)
 
 
 # Q2
@@ -104,7 +109,25 @@ def transformer_classification(portion=1.):
     # Add your code here
     # see https://huggingface.co/docs/transformers/v4.25.1/en/quicktour#trainer-a-pytorch-optimized-training-loop
     # Use the DataSet object defined above. No need for a DataCollator
-    return
+
+    training_args = TrainingArguments(
+        output_dir="q2_out",
+        learning_rate=5e-5,
+        per_device_train_batch_size=16,
+        per_device_eval_batch_size=16,
+        num_train_epochs=5,
+    )
+
+    trainer = Trainer(
+        model=model,
+        args=training_args,
+        train_dataset=(x_train, y_train),
+        eval_dataset=(x_test, y_test),
+        tokenizer=tokenizer
+    )
+
+    trainer.train()
+    return trainer.evaluate()
 
 
 # Q3
@@ -128,11 +151,12 @@ def zeroshot_classification(portion=1.):
 
 if __name__ == "__main__":
     portions = [0.1, 0.5, 1.]
+
     # Q1
-    print("Logistic regression results:")
-    for p in portions:
-        print(f"Portion: {p}")
-        print(linear_classification(p))
+    # print("Logistic regression results:")
+    # for p in portions:
+    #     print(f"Portion: {p}")
+    #     print(linear_classification(p))
 
     # Q2
     print("\nFinetuning results:")
