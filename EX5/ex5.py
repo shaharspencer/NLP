@@ -150,12 +150,12 @@ def zeroshot_classification(portion=1.):
 
     # Add your code here
     # see https://huggingface.co/docs/transformers/v4.25.1/en/main_classes/pipelines#transformers.ZeroShotClassificationPipeline
-    oracle = clf(x_test, candidate_labels=candidate_labels, top_k=1)
+    oracle = clf(x_test, candidate_labels=candidate_labels)
     counter = 0
     progress = 0
     for i, item in enumerate(oracle):
         progress += 1
-        if category_dict[item['answer']] == y_test[i]:
+        if item['labels'][np.argmax(item['scores'])] == candidate_labels[y_test[i]]:
             counter += 1
 
     return counter / progress
