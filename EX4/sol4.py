@@ -3,8 +3,13 @@ from Chu_Liu_Edmonds_algorithm import min_spanning_arborescence_nx as get_mst
 from nltk.corpus import dependency_treebank
 from nltk import DependencyGraph
 from collections import namedtuple
+import random
 
 Arc = namedtuple("Arc", ["head", "tail", "weight"])
+
+
+def get_sent_root_tuple(sent: DependencyGraph):
+    return 0, sent.root["address"]
 
 
 class MSTParser:
@@ -15,86 +20,107 @@ class MSTParser:
         self.feature_map = {}
         self.weights = None
 
-    def construct_feat_vec_dataframe(self, parsed_sent: list[DependencyGraph]):
+    def construct_feature_map(self, parsed_sent: list[DependencyGraph]):
         index = 0
         for sent in parsed_sent:
-            _, node_lst = zip(*list(sent.nodes.items()))
-            for i in range(len(node_lst)):
-                for j in range(1, len(node_lst)):
-                    if i == j:
+            keys = sent.nodes.keys()
+            for i in keys:
+                for j in keys:
+                    if i == j or j == 0:
                         continue
                     try:
-                        lemma_key = node_lst[i]['lemma'] + ":lemma:" + node_lst[j]['lemma']
+                        word_key = sent.nodes[i]['word'] + ":word:" + sent.nodes[j]['word']
                     except TypeError:
-                        lemma_key = "TOP:lemma:" + node_lst[j]['lemma']
+                        word_key = "TOP:word:" + sent.nodes[j]['word']
 
-                    pos_key = node_lst[i]['tag'] + ":pos:" + node_lst[j]['tag']
+                    pos_key = sent.nodes[i]['tag'] + ":pos:" + sent.nodes[j]['tag']
 
-                    if lemma_key not in self.feature_map:
-                        self.feature_map[lemma_key] = index
+                    if word_key not in self.feature_map:
+                        self.feature_map[word_key] = index
                         index += 1
                     if pos_key not in self.feature_map:
                         self.feature_map[pos_key] = index
                         index += 1
 
-    def feature_function(self, node1: dict, node2: dict) -> np.ndarray:
-
+    def feature_function(self, node1: dict, node2: dict):
         feature_vec = np.zeros(len(self.feature_map))
         try:
-            feature_vec[self.feature_map[node1["lemma"] + ":lemma:" + node2["lemma"]]] = 1
+            feature_vec[self.feature_map[node1["word"] + ":word:" + node2["word"]]] = 1
         except TypeError:
-            feature_vec[self.feature_map["TOP:lemma:" + node2["lemma"]]] = 1
+            feature_vec[self.feature_map["TOP:word:" + node2["word"]]] = 1
 
         feature_vec[self.feature_map[node1["tag"] + ":pos:" + node2["tag"]]] = 1
 
         return feature_vec
 
+    def get_arc_score(self, node1: dict, node2: dict, weights):
+        ind1, ind2 = self.get_feature_map_indices(node1, node2)
+
+        return weights[ind1] + weights[ind2]
+
+    def get_feature_map_indices(self, node1: dict, node2: dict):
+        try:
+            ind1 = self.feature_map[node1["word"] + ":word:" + node2["word"]]
+        except TypeError:
+            ind1 = self.feature_map["TOP:word:" + node2["word"]]
+
+        ind2 = self.feature_map[node1["tag"] + ":pos:" + node2["tag"]]
+
+        return ind1, ind2
+
     def get_all_possible_arcs(self, sent: DependencyGraph, weights):
         arcs = []
-        _, node_lst = zip(*list(sent.nodes.items()))
-        print("start")
-
-        for i in range(len(node_lst)):
-            for j in range(1, len(node_lst)):
-                if i == j:
+        keys = sent.nodes.keys()
+        for i in keys:
+            for j in keys:
+                if i == j or j == 0:
                     continue
-                arcs.append(Arc(i, j, - (self.feature_function(node_lst[i], node_lst[j]) @ weights)))
-        print("end")
+                arcs.append(Arc(i, j, - self.get_arc_score(sent.nodes[i], sent.nodes[j], weights)))
 
         return arcs
-    #
-    def sum_feature_func_over_arcs(self, arcs, sent: DependencyGraph):
-        s = np.zeros(len(self.feature_map))
-        _, node_lst = zip(*list(sent.nodes.items()))
-        for arc in arcs:
-            s += self.feature_function(node_lst[arc[0]], node_lst[arc[1]])
-        return s
 
-    def perceptron(self, lr: float, n_iterations: int):
-        weights_list = [np.zeros(len(self.feature_map))]
+    def update_weights(self, sent, true_arcs, mst_arcs, weights, lr):
+        for arc in true_arcs:
+            ind1, ind2 = self.get_feature_map_indices(sent.nodes[arc[1]], sent.nodes[arc[0]])
+            weights[ind1] += 1 * lr
+            weights[ind2] += 1 * lr
+
+        for arc in mst_arcs:
+            ind1, ind2 = self.get_feature_map_indices(sent.nodes[arc[0]], sent.nodes[arc[1]])
+            weights[ind1] -= 1 * lr
+            weights[ind2] -= 1 * lr
+
+        return weights
+
+    def perceptron(self, lr: float, n_iterations: int) -> np.ndarray:
+        weights = np.zeros(len(self.feature_map))
+        prev_weight_sum = np.zeros(len(self.feature_map))
 
         for _ in range(n_iterations):
             index = 0
+            random.shuffle(self.train_set)
             for sent in self.train_set:
-                if index % 5 == 0:
+                if index % 100 == 0:
                     print(index)
                 index += 1
 
-                possible = self.get_all_possible_arcs(sent, weights_list[-1])
-                mst = get_mst(possible, 0)  # get_mst(- , None)
-                weights_list.append(weights_list[-1] +
-                                    lr * (self.sum_feature_func_over_arcs(sent.nx_graph().edges, sent) -
-                                          self.sum_feature_func_over_arcs(mst.values(), sent)))
+                possible = self.get_all_possible_arcs(sent, weights)
+                mst = list(get_mst(possible, 0).values())
 
-        return np.sum(np.array(weights_list), axis=0) / (n_iterations * len(self.train_set))
+                true_root = get_sent_root_tuple(sent)
+                true_arcs = list(sent.nx_graph().edges) + [(true_root[1], true_root[0])]
+
+                weights = self.update_weights(sent, true_arcs, mst, weights, lr)
+
+                prev_weight_sum += weights
+
+        return prev_weight_sum / (n_iterations * len(self.train_set))
 
     def fit(self, parsed_sents: list[DependencyGraph]):
         self.train_set = parsed_sents[:int(0.9 * len(parsed_sents))]
         self.test_set = parsed_sents[int(0.9 * len(parsed_sents)):]
-        self.construct_feat_vec_dataframe(parsed_sents)
+        self.construct_feature_map(parsed_sents)
         self.weights = self.perceptron(1, 2)
-
-        self.train_set[0].nx_graph()
 
     def compute_attachment_score(self):
         score = 0
@@ -103,8 +129,8 @@ class MSTParser:
             mst = get_mst(arcs, 0)
             heads, tails, _ = zip(*mst.values())
             prediction = set(zip(heads, tails))
-            heads, tails, _ = zip(*sent.nx_graph().edges)
-            label = set(zip(heads, tails))
+            tails, heads, _ = zip(*sent.nx_graph().edges)
+            label = set(list(zip(heads, tails)) + [get_sent_root_tuple(sent)])
             score += (len(prediction.intersection(label)) / len(label))
 
         return score / len(self.test_set)
