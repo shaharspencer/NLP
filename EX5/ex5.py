@@ -115,11 +115,11 @@ def transformer_classification(portion=1.):
         learning_rate=5e-5,
         per_device_train_batch_size=16,
         per_device_eval_batch_size=16,
-        num_train_epochs=5,
+        num_train_epochs=5
     )
 
-    train_dataset = Dataset(tokenizer(x_train), tokenizer(y_train))
-    test_dataset = Dataset(tokenizer(x_test), y_test)
+    train_dataset = Dataset(tokenizer(x_train, padding='longest', truncation=True), y_train)
+    test_dataset = Dataset(tokenizer(x_test, padding='longest', truncation=True), y_test)
 
     trainer = Trainer(
         model=model,
