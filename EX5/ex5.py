@@ -125,7 +125,8 @@ def transformer_classification(portion=1.):
         model=model,
         args=training_args,
         train_dataset=train_dataset,
-        eval_dataset=test_dataset
+        eval_dataset=test_dataset,
+        compute_metrics=compute_metrics
         #tokenizer=tokenizer
     )
 
